@@ -13,35 +13,67 @@ def create_from_tree(root_name, custom_path):
     os.makedirs(base_path, exist_ok=True)
     return base_path
 
+def read_tree_from_file(file_path):
+    with open(file_path, 'r') as file:
+        tree = file.read()
+    return tree
+
+def create_from_tree(root_name, custom_path):
+    base_path = os.path.join(os.path.abspath(custom_path), root_name) if custom_path else os.path.abspath(root_name)
+    os.makedirs(base_path, exist_ok=True)
+    return base_path
+
 def create_structure(tree, base_path):
-    current_path = base_path
     path_levels = {0: base_path}  # Initialize the root path
+    last_indent_level = 0  # Keep track of the last line's indent level
 
     for line in tree.strip().split('\n'):
-        indent_level = (len(line) - len(line.lstrip(' |'))) // 2
+        indent_count = 0
+        cleaned_line = line.lstrip("|")
+
+        for char in cleaned_line:
+            if char in [' ', '+', '-']:
+                indent_count += 1
+            elif char.isalnum():
+                break
+
+        indent_level = indent_count // 2
         name = line.strip(' |+-')
         is_dir = '+' in line
 
-        # Ensure current_path is correctly updated for each indentation level
-        if indent_level in path_levels:
-            current_path = path_levels[indent_level]
+        # Handling the hierarchical structure based on indent_level comparison
+        if indent_level > last_indent_level:
+            # If current indent level is greater, make this line the child of the one before it
+            current_path = os.path.join(path_levels[last_indent_level], name)
+        elif indent_level == last_indent_level:
+            # If indent level is the same, sibling case
+            current_path = os.path.join(os.path.dirname(path_levels[last_indent_level]), name)
         else:
-            # If the expected level isn't directly available, use the highest known level
-            # This handles skipped levels gracefully
-            current_path = path_levels[max(path_levels.keys())]
+            # If current indent level is smaller, go up the hierarchy as needed
+            # Determine how many levels to go up
+            level_difference = last_indent_level - indent_level
+            while level_difference > 0:
+                current_path = os.path.dirname(path_levels[last_indent_level - level_difference])
+                level_difference -= 1
+            current_path = os.path.join(current_path, name)
 
+        # Update or create the directory/file based on is_dir
         if is_dir:
-            new_dir_path = os.path.join(current_path, name)
-            os.makedirs(new_dir_path, exist_ok=True)
-            # Update the path for the current level and remove any higher levels that might have been incorrectly inferred
-            path_levels[indent_level] = new_dir_path
-            # This loop cleans up any 'future' paths that might not be valid after adding a new branch in the tree
-            for key in list(path_levels.keys()):
-                if key > indent_level:
-                    del path_levels[key]
+            os.makedirs(current_path, exist_ok=True)
         else:
-            file_path = os.path.join(current_path, name)
-            open(file_path, "a").close()
+            open(current_path, "a").close()
+
+        # Update path_levels for the current indent level and clean up higher levels
+        path_levels[indent_level] = current_path
+        for key in list(path_levels.keys()):
+            if key > indent_level:
+                del path_levels[key]
+
+        # Update last_indent_level for the next iteration
+        last_indent_level = indent_level
+
+
+
 
 def process_tree_from_file(file_path, root_name, custom_path=None):
     tree = read_tree_from_file(file_path)
