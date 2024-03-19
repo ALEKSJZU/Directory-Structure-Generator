@@ -23,14 +23,16 @@ def create_from_tree(root_name, custom_path):
     os.makedirs(base_path, exist_ok=True)
     return base_path
 
+
 def create_structure(tree, base_path):
-    path_levels = {0: base_path}  # Initialize the root path
-    last_indent_level = 0  # Keep track of the last line's indent level
+    path_levels = {0: base_path}  # Initialize the root path with the base directory
+    last_indent_level = 0  # Track the last line's indent level for comparison
 
     for line in tree.strip().split('\n'):
         indent_count = 0
         cleaned_line = line.lstrip("|")
 
+        # Counting spaces and '+' or '-' signs to determine indentation level
         for char in cleaned_line:
             if char in [' ', '+', '-']:
                 indent_count += 1
@@ -41,37 +43,35 @@ def create_structure(tree, base_path):
         name = line.strip(' |+-')
         is_dir = '+' in line
 
-        # Handling the hierarchical structure based on indent_level comparison
+        # Handling the hierarchical structure based on the comparison of indent levels
         if indent_level > last_indent_level:
-            # If current indent level is greater, make this line the child of the one before it
-            current_path = os.path.join(path_levels[last_indent_level], name)
+            # Child of the previous line
+            parent_path = path_levels[last_indent_level]
         elif indent_level == last_indent_level:
-            # If indent level is the same, sibling case
-            current_path = os.path.join(os.path.dirname(path_levels[last_indent_level]), name)
+            # Sibling of the previous line
+            parent_path = os.path.dirname(path_levels[last_indent_level])
         else:
-            # If current indent level is smaller, go up the hierarchy as needed
-            # Determine how many levels to go up
-            level_difference = last_indent_level - indent_level
-            while level_difference > 0:
-                current_path = os.path.dirname(path_levels[last_indent_level - level_difference])
-                level_difference -= 1
-            current_path = os.path.join(current_path, name)
+            # Determine how many levels to go up based on the difference
+            parent_path = path_levels[indent_level - 1]
 
-        # Update or create the directory/file based on is_dir
+        # Construct the current path
+        current_path = os.path.join(parent_path, name)
+
+        # Create directory or file
         if is_dir:
             os.makedirs(current_path, exist_ok=True)
         else:
             open(current_path, "a").close()
 
-        # Update path_levels for the current indent level and clean up higher levels
+        # Update the path_levels dictionary for the current indent level
         path_levels[indent_level] = current_path
-        for key in list(path_levels.keys()):
-            if key > indent_level:
-                del path_levels[key]
+        # Clean up any outdated entries in path_levels
+        keys_to_remove = [k for k in path_levels if k > indent_level]
+        for key in keys_to_remove:
+            del path_levels[key]
 
-        # Update last_indent_level for the next iteration
+        # Update last_indent_level for comparison in the next iteration
         last_indent_level = indent_level
-
 
 
 
